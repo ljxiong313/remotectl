@@ -5,6 +5,23 @@ import { useI18n } from '../i18n'
 const isLocalMac = /Mac|iPhone|iPod|iPad/.test(navigator.platform)
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
+// 向日葵风格配色
+const COLORS = {
+  primary: '#FF7A00',
+  primaryDark: '#E66A00',
+  primaryBg: 'rgba(255, 122, 0, 0.1)',
+  surface: '#FFFFFF',
+  surface2: '#F5F5F5',
+  surface3: '#EBEBEB',
+  border: '#E8E8E8',
+  text1: '#333333',
+  text2: '#666666',
+  text3: '#999999',
+  success: '#52C41A',
+  error: '#FF4D4F',
+  warning: '#FAAD14',
+}
+
 interface Props {
   videoStream: MediaStream | null
   onInput: (e: InputEvent) => void
@@ -13,27 +30,36 @@ interface Props {
   remotePlatform: string
 }
 
+// 工具栏按钮定义
+interface ToolButton {
+  id: string
+  icon: string
+  label: string
+  active?: boolean
+  disabled?: boolean
+}
+
 export default function RemoteScreen({ videoStream, onInput, onDisconnect, deviceName, remotePlatform }: Props) {
   const { t } = useI18n()
-  const videoRef    = useRef<HTMLVideoElement>(null)
-  const cursorRef   = useRef<HTMLDivElement>(null)
-  const kbInputRef    = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const cursorRef = useRef<HTMLDivElement>(null)
+  const kbInputRef = useRef<HTMLInputElement>(null)
+  
   const [showKb, setShowKb] = useState(false)
   const [showDisconnectDlg, setShowDisconnectDlg] = useState(false)
+  const [connectionQuality] = useState<'excellent' | 'good' | 'poor'>('excellent')
 
+  // Ctrl/Cmd 切换
   const defaultSwap = !isLocalMac && (remotePlatform === 'darwin' || remotePlatform === '')
   const [swapCtrlCmd, setSwapCtrlCmd] = useState(defaultSwap)
 
-  // Sticky modifier keys (mobile)
+  // 移动端修饰键
   const [activeMods, setActiveMods] = useState<Set<string>>(new Set())
 
-  // Toolbar auto-hide (desktop only; mobile toolbar is always small)
+  // 工具栏自动隐藏
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [toolbarVisible, setToolbarVisible] = useState(true)
 
-  // Only resets the auto-hide countdown — does NOT show the toolbar.
-  // Separating show from timer-reset means clicking ▲ permanently hides
-  // the toolbar; mouse movement can't bring it back (only ▼ can).
   const resetHideTimer = useCallback(() => {
     if (!isMobile) {
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
@@ -43,7 +69,6 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
 
   useEffect(() => {
     if (!isMobile) {
-      // Show toolbar initially, then start the auto-hide countdown.
       setToolbarVisible(true)
       resetHideTimer()
     }
@@ -57,7 +82,7 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
     if (videoStream) v.play().catch(() => {})
   }, [videoStream])
 
-  // ── coordinate mapping ────────────────────────────────────────────────────
+  // 坐标映射
   const toRemote = useCallback((clientX: number, clientY: number): [number, number] => {
     const v = videoRef.current
     if (!v || !v.videoWidth || !v.videoHeight) return [0, 0]
@@ -67,13 +92,13 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
     let rW: number, rH: number, oX: number, oY: number
     if (vAspect > cAspect) {
       rW = rect.width; rH = rect.width / vAspect
-      oX = 0;         oY = (rect.height - rH) / 2
+      oX = 0; oY = (rect.height - rH) / 2
     } else {
       rW = rect.height * vAspect; rH = rect.height
       oX = (rect.width - rW) / 2; oY = 0
     }
     const x = ((clientX - rect.left - oX) / rW) * v.videoWidth
-    const y = ((clientY - rect.top  - oY) / rH) * v.videoHeight
+    const y = ((clientY - rect.top - oY) / rH) * v.videoHeight
     return [Math.round(x), Math.round(y)]
   }, [])
 
@@ -82,23 +107,22 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
     const v = videoRef.current
     if (!c || !v) return
     const rect = v.getBoundingClientRect()
-    c.style.left    = `${clientX - rect.left}px`
-    c.style.top     = `${clientY - rect.top}px`
+    c.style.left = `${clientX - rect.left}px`
+    c.style.top = `${clientY - rect.top}px`
     c.style.display = show ? 'block' : 'none'
   }, [])
 
-  // ── keyboard helpers ──────────────────────────────────────────────────────
+  // 键盘修饰键
   const getMods = useCallback((e: MouseEvent | KeyboardEvent): string[] => {
     const m: string[] = []
-    if (e.ctrlKey)  m.push('ctrl')
+    if (e.ctrlKey) m.push('ctrl')
     if (e.shiftKey) m.push('shift')
-    if (e.altKey)   m.push('alt')
-    if (e.metaKey)  m.push('meta')
+    if (e.altKey) m.push('alt')
+    if (e.metaKey) m.push('meta')
     if (!swapCtrlCmd) return m
     return m.map(k => k === 'ctrl' ? 'meta' : k === 'meta' ? 'ctrl' : k)
   }, [swapCtrlCmd])
 
-  // Resolve active sticky mods (with Ctrl⇄Cmd swap applied)
   const getActiveMods = useCallback((): string[] => {
     const mods = [...activeMods]
     if (!swapCtrlCmd) return mods
@@ -107,7 +131,7 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
 
   const clearMods = useCallback(() => setActiveMods(new Set()), [])
 
-  // ── desktop mouse ─────────────────────────────────────────────────────────
+  // 桌面鼠标事件
   const lastSendTime = useRef(0)
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
@@ -120,12 +144,12 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
     onInput({ event: 'mousemove', x, y })
   }, [toRemote, onInput, moveCursor, resetHideTimer])
 
-  const onMouseDown  = useCallback((e: React.MouseEvent) => {
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
     const [x, y] = toRemote(e.clientX, e.clientY)
     onInput({ event: 'mousedown', x, y, button: e.button, mods: getMods(e.nativeEvent) })
   }, [toRemote, onInput, getMods])
 
-  const onMouseUp    = useCallback((e: React.MouseEvent) => {
+  const onMouseUp = useCallback((e: React.MouseEvent) => {
     const [x, y] = toRemote(e.clientX, e.clientY)
     onInput({ event: 'mouseup', x, y, button: e.button })
   }, [toRemote, onInput])
@@ -142,13 +166,13 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
 
   const onContextMenu = useCallback((e: React.MouseEvent) => { e.preventDefault() }, [])
 
-  // ── touch ─────────────────────────────────────────────────────────────────
-  const touchStart      = useRef<{ x: number; y: number; t: number } | null>(null)
-  const longPressTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const prevCentroid    = useRef<{ x: number; y: number } | null>(null)
-  const prevPinchDist   = useRef<number | null>(null)
-  const touchDragging   = useRef(false)
-  const twoFingerUsed   = useRef(false) // true if 2+ fingers were active in this gesture
+  // 触摸事件
+  const touchStart = useRef<{ x: number; y: number; t: number } | null>(null)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevCentroid = useRef<{ x: number; y: number } | null>(null)
+  const prevPinchDist = useRef<number | null>(null)
+  const touchDragging = useRef(false)
+  const twoFingerUsed = useRef(false)
 
   const clearLongPress = () => {
     if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
@@ -165,27 +189,19 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
         clearLongPress()
         const [rx2, ry2] = toRemote(t.clientX, t.clientY)
         onInput({ event: 'mousedown', x: rx2, y: ry2, button: 2 })
-        onInput({ event: 'mouseup',   x: rx2, y: ry2, button: 2 })
+        onInput({ event: 'mouseup', x: rx2, y: ry2, button: 2 })
         touchStart.current = null
         if (navigator.vibrate) navigator.vibrate(40)
       }, 600)
     } else {
       clearLongPress()
       twoFingerUsed.current = true
-      // Hide keyboard and toolbar on two-finger scroll
-      if (showKb) {
-        setShowKb(false)
-        setActiveMods(new Set())
-        kbInputRef.current?.blur()
-      }
+      if (showKb) { setShowKb(false); setActiveMods(new Set()); kbInputRef.current?.blur() }
       setToolbarVisible(false)
       const t0 = e.touches[0], t1 = e.touches[1]
       const dx = t0.clientX - t1.clientX, dy = t0.clientY - t1.clientY
       prevPinchDist.current = Math.hypot(dx, dy)
-      prevCentroid.current = {
-        x: (t0.clientX + t1.clientX) / 2,
-        y: (t0.clientY + t1.clientY) / 2,
-      }
+      prevCentroid.current = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 }
     }
   }, [toRemote, onInput, moveCursor, showKb])
 
@@ -196,12 +212,8 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
       const start = touchStart.current
       if (start) {
         const dist = Math.hypot(t.clientX - start.x, t.clientY - start.y)
-        if (dist > 8) {
-          clearLongPress()
-          touchDragging.current = true
-        }
+        if (dist > 8) { clearLongPress(); touchDragging.current = true }
       }
-      // Single-finger drag → scroll
       if (touchDragging.current) {
         const prev = prevCentroid.current
         prevCentroid.current = { x: t.clientX, y: t.clientY }
@@ -215,12 +227,7 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
       }
     } else if (e.touches.length === 2) {
       const t0 = e.touches[0], t1 = e.touches[1]
-      const cx = (t0.clientX + t1.clientX) / 2
-      const cy = (t0.clientY + t1.clientY) / 2
-      const dx = t0.clientX - t1.clientX, dy = t0.clientY - t1.clientY
-      const dist = Math.hypot(dx, dy)
-
-      // Two-finger scroll (centroid movement)
+      const cx = (t0.clientX + t1.clientX) / 2, cy = (t0.clientY + t1.clientY) / 2
       if (prevCentroid.current) {
         const sdx = (prevCentroid.current.x - cx) * 2
         const sdy = (prevCentroid.current.y - cy) * 2
@@ -229,27 +236,23 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
         }
       }
       prevCentroid.current = { x: cx, y: cy }
-      prevPinchDist.current = dist
     }
   }, [toRemote, onInput, moveCursor])
 
   const onTouchEnd = useCallback((e: React.TouchEvent) => {
     e.preventDefault()
     clearLongPress()
-
     if (!twoFingerUsed.current && touchStart.current && e.changedTouches.length >= 1) {
       const t = e.changedTouches[0]
       const dist = Math.hypot(t.clientX - touchStart.current.x, t.clientY - touchStart.current.y)
       if (dist < 10) {
-        // Tap → click
         const [rx, ry] = toRemote(t.clientX, t.clientY)
         onInput({ event: 'mousemove', x: rx, y: ry })
         onInput({ event: 'mousedown', x: rx, y: ry, button: 0 })
-        onInput({ event: 'mouseup',   x: rx, y: ry, button: 0 })
+        onInput({ event: 'mouseup', x: rx, y: ry, button: 0 })
         if (isMobile) setToolbarVisible(true)
       }
     }
-
     if (e.touches.length === 0) {
       touchStart.current = null
       prevCentroid.current = null
@@ -257,15 +260,10 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
       touchDragging.current = false
       twoFingerUsed.current = false
       moveCursor(0, 0, false)
-    } else if (e.touches.length === 1) {
-      // Dropped from 2 fingers to 1 — clear two-finger state so the
-      // remaining finger's first move doesn't produce a huge jump.
-      prevCentroid.current = null
-      prevPinchDist.current = null
     }
   }, [toRemote, onInput, moveCursor, setToolbarVisible])
 
-  // ── keyboard ──────────────────────────────────────────────────────────────
+  // 键盘事件
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     e.preventDefault()
     onInput({ event: 'keydown', key: e.key, code: e.code, mods: getMods(e.nativeEvent) })
@@ -276,17 +274,15 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
     onInput({ event: 'keyup', key: e.key, code: e.code, mods: getMods(e.nativeEvent) })
   }, [onInput, getMods])
 
-  // Mobile virtual keyboard: physical keys (non-IME)
   const handleKbKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Unidentified') return // IME composing, wait for input event
+    if (e.key === 'Unidentified') return
     e.preventDefault()
     const mods = getActiveMods()
     onInput({ event: 'keydown', key: e.key, code: e.code, mods })
-    onInput({ event: 'keyup',   key: e.key, code: e.code, mods })
+    onInput({ event: 'keyup', key: e.key, code: e.code, mods })
     if (activeMods.size > 0) clearMods()
   }, [onInput, getActiveMods, activeMods, clearMods])
 
-  // IME / soft keyboard text input → paste_text, with \n → Enter
   const handleKbInput = useCallback((e: React.FormEvent<HTMLInputElement>) => {
     const input = e.currentTarget
     const text = input.value
@@ -294,17 +290,15 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
     input.value = ''
     const mods = getActiveMods()
     if (activeMods.size > 0) clearMods()
-
     const parts = text.split('\n')
     for (let i = 0; i < parts.length; i++) {
       if (parts[i]) {
         if (mods.length > 0) {
-          // Modifiers armed: send each char individually
           for (const ch of parts[i]) {
             const upper = ch.toUpperCase()
             const code = /^[a-zA-Z]$/.test(ch) ? `Key${upper}` : /^[0-9]$/.test(ch) ? `Digit${ch}` : ch === ' ' ? 'Space' : ch
             onInput({ event: 'keydown', key: ch, code, mods } as any)
-            onInput({ event: 'keyup',   key: ch, code, mods } as any)
+            onInput({ event: 'keyup', key: ch, code, mods } as any)
           }
         } else {
           onInput({ event: 'paste_text', text: parts[i] } as any)
@@ -312,16 +306,15 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
       }
       if (i < parts.length - 1) {
         onInput({ event: 'keydown', key: 'Enter', code: 'Enter', mods } as any)
-        onInput({ event: 'keyup',   key: 'Enter', code: 'Enter', mods } as any)
+        onInput({ event: 'keyup', key: 'Enter', code: 'Enter', mods } as any)
       }
     }
   }, [onInput, getActiveMods, activeMods, clearMods])
 
-  // Mobile: send a special key, then re-focus the hidden input
   const sendSpecialKey = useCallback((key: string, code: string) => {
     const mods = getActiveMods()
     onInput({ event: 'keydown', key, code, mods } as any)
-    onInput({ event: 'keyup',   key, code, mods } as any)
+    onInput({ event: 'keyup', key, code, mods } as any)
     if (activeMods.size > 0) clearMods()
     kbInputRef.current?.focus()
   }, [onInput, getActiveMods, activeMods, clearMods])
@@ -345,7 +338,7 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
     if (input) input.focus()
   }, [])
 
-  // ── paste ─────────────────────────────────────────────────────────────────
+  // 粘贴
   const onPaste = useCallback((e: React.ClipboardEvent) => {
     e.preventDefault()
     const text = e.clipboardData.getData('text/plain')
@@ -360,93 +353,139 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
       const text = window.prompt(t('paste_prompt'))
       if (text) onInput({ event: 'paste_text', text } as any)
     }
-  }, [onInput])
+  }, [onInput, t])
+
+  // 工具栏按钮
+  const toolButtons: ToolButton[] = [
+    { id: 'keyboard', icon: '⌨️', label: '键盘' },
+    { id: 'screenshot', icon: '📷', label: '截屏' },
+    { id: 'clipboard', icon: '📋', label: '粘贴' },
+    { id: 'reboot', icon: '🔄', label: '重启' },
+    { id: 'ctrl', icon: swapCtrlCmd ? '⌘' : 'Ctrl', label: 'Ctrl⇄⌘', active: swapCtrlCmd },
+  ]
+
+  const handleToolClick = (id: string) => {
+    switch (id) {
+      case 'keyboard':
+        if (isMobile) toggleKeyboard()
+        break
+      case 'screenshot':
+        // 截图功能
+        break
+      case 'clipboard':
+        sendClipboard()
+        break
+      case 'reboot':
+        onInput({ event: 'reboot' } as any)
+        break
+      case 'ctrl':
+        setSwapCtrlCmd(v => !v)
+        break
+    }
+  }
 
   return (
     <div style={styles.wrapper}>
-      {/* ── toolbar ── */}
+      {/* 向日葵风格顶部工具栏 */}
       <div style={{
         ...styles.toolbar,
         transform: toolbarVisible ? 'none' : 'translateY(-100%)',
         pointerEvents: toolbarVisible ? undefined : 'none',
-        transition: 'transform 0.2s ease',
       }}>
-        <span style={styles.toolbarLabel}>🖥 {deviceName}</span>
-        <div style={styles.toolbarRight}>
-          {!isMobile && (
-            <label style={styles.swapLabel} title={t('ctrl_swap_title')}>
-              <input type="checkbox" checked={swapCtrlCmd}
-                onChange={e => setSwapCtrlCmd(e.target.checked)} style={{ marginRight: 4 }} />
-              <span style={{ fontSize: 12, color: swapCtrlCmd ? 'var(--green)' : 'var(--text-3)', fontFamily: 'var(--mono)' }}>Ctrl ⇄ ⌘</span>
-            </label>
-          )}
-          <button style={styles.toolBtn} onClick={sendClipboard}
-            title={t('paste_title')}>{t('paste')}</button>
-          {isMobile && (
+        {/* 左侧：设备信息 */}
+        <div style={styles.toolbarLeft}>
+          <div style={styles.deviceBadge}>
+            <span style={styles.deviceIcon}>💻</span>
+            <span style={styles.deviceName}>{deviceName}</span>
+          </div>
+          <div style={styles.connectionStatus}>
+            <span style={{
+              ...styles.statusDot,
+              background: connectionQuality === 'excellent' ? COLORS.success : 
+                         connectionQuality === 'good' ? COLORS.warning : COLORS.error
+            }} />
+            <span style={styles.statusText}>
+              {connectionQuality === 'excellent' ? '连接良好' : 
+               connectionQuality === 'good' ? '连接一般' : '连接较差'}
+            </span>
+          </div>
+        </div>
+
+        {/* 中间：工具按钮 */}
+        <div style={styles.toolbarCenter}>
+          {toolButtons.map(btn => (
             <button
-              style={{ ...styles.toolBtn, color: showKb ? 'var(--green)' : 'var(--text-2)', borderColor: showKb ? 'var(--green-bdr)' : 'var(--border-2)' }}
-              onClick={toggleKeyboard}>{t('keyboard')}</button>
-          )}
-          <button style={styles.toolBtn} onClick={() => setToolbarVisible(false)}
-            title="Hide toolbar">▲</button>
-          <button style={styles.disconnectBtn} onClick={() => setShowDisconnectDlg(true)}>{t('disconnect')}</button>
+              key={btn.id}
+              onClick={() => handleToolClick(btn.id)}
+              style={{
+                ...styles.toolBtn,
+                ...(btn.active ? styles.toolBtnActive : {})
+              }}
+              title={btn.label}
+            >
+              <span style={styles.toolBtnIcon}>{btn.icon}</span>
+              <span style={styles.toolBtnLabel}>{btn.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* 右侧：操作按钮 */}
+        <div style={styles.toolbarRight}>
+          <button
+            onClick={() => setToolbarVisible(false)}
+            style={styles.hideBtn}
+            title="隐藏工具栏"
+          >
+            ▲
+          </button>
+          <button
+            onClick={() => setShowDisconnectDlg(true)}
+            style={styles.disconnectBtn}
+          >
+            断开连接
+          </button>
         </div>
       </div>
 
-      {/* ── show-toolbar trigger (top edge, visible when toolbar hidden) ── */}
+      {/* 工具栏显示按钮 */}
       {!toolbarVisible && (
         <div
           onClick={() => { setToolbarVisible(true); resetHideTimer() }}
-          style={{
-            position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 20, cursor: 'pointer', padding: '2px 16px',
-            background: 'var(--surface)', border: '1px solid var(--border-2)',
-            borderTop: 'none', borderRadius: '0 0 8px 8px',
-            color: 'var(--text-3)', fontSize: 11, lineHeight: '18px',
-            transition: 'color 0.15s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-1)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-3)')}
-        >▼</div>
+          style={styles.showToolbar}
+        >
+          ▼ 显示工具栏
+        </div>
       )}
 
-      {/* ── mobile modifier key row ── */}
+      {/* 移动端修饰键行 */}
       {isMobile && showKb && (
         <div style={styles.modRow}>
           <div style={styles.modRowInner}>
-            {/* Sticky modifiers */}
-            {(['ctrl','shift','alt','meta'] as const).map(mod => (
+            {(['ctrl', 'shift', 'alt', 'meta'] as const).map(mod => (
               <ModKey key={mod}
                 label={mod === 'meta' ? 'Cmd' : mod === 'ctrl' ? 'Ctrl' : mod === 'shift' ? 'Shift' : 'Alt'}
                 active={activeMods.has(mod)}
                 onTap={() => toggleModifier(mod)} />
             ))}
             <div style={styles.modSep} />
-            <ModKey label="Tab"   onTap={() => sendSpecialKey('Tab',       'Tab')} />
-            <ModKey label="Esc"   onTap={() => sendSpecialKey('Escape',    'Escape')} />
-            <ModKey label="Del"   onTap={() => sendSpecialKey('Delete',    'Delete')} />
-            <ModKey label="`"     onTap={() => sendSpecialKey('`',         'Backquote')} />
-            <ModKey label="Space" onTap={() => sendSpecialKey(' ',         'Space')} />
+            <ModKey label="Tab" onTap={() => sendSpecialKey('Tab', 'Tab')} />
+            <ModKey label="Esc" onTap={() => sendSpecialKey('Escape', 'Escape')} />
+            <ModKey label="Del" onTap={() => sendSpecialKey('Delete', 'Delete')} />
+            <ModKey label="`" onTap={() => sendSpecialKey('`', 'Backquote')} />
+            <ModKey label="Space" onTap={() => sendSpecialKey(' ', 'Space')} />
             <div style={styles.modSep} />
-            <ModKey label="←"   onTap={() => sendSpecialKey('ArrowLeft',  'ArrowLeft')} />
-            <ModKey label="↑"   onTap={() => sendSpecialKey('ArrowUp',    'ArrowUp')} />
-            <ModKey label="↓"   onTap={() => sendSpecialKey('ArrowDown',  'ArrowDown')} />
-            <ModKey label="→"   onTap={() => sendSpecialKey('ArrowRight', 'ArrowRight')} />
+            <ModKey label="←" onTap={() => sendSpecialKey('ArrowLeft', 'ArrowLeft')} />
+            <ModKey label="↑" onTap={() => sendSpecialKey('ArrowUp', 'ArrowUp')} />
+            <ModKey label="↓" onTap={() => sendSpecialKey('ArrowDown', 'ArrowDown')} />
+            <ModKey label="→" onTap={() => sendSpecialKey('ArrowRight', 'ArrowRight')} />
             <div style={styles.modSep} />
-            <ModKey label="Home" onTap={() => sendSpecialKey('Home',      'Home')} />
-            <ModKey label="End"  onTap={() => sendSpecialKey('End',       'End')} />
-            <ModKey label="PgUp" onTap={() => sendSpecialKey('PageUp',    'PageUp')} />
-            <ModKey label="PgDn" onTap={() => sendSpecialKey('PageDown',  'PageDown')} />
-            <div style={styles.modSep} />
-            {Array.from({ length: 12 }, (_, i) => (
-              <ModKey key={`f${i+1}`} label={`F${i+1}`}
-                onTap={() => sendSpecialKey(`F${i+1}`, `F${i+1}`)} />
-            ))}
+            <ModKey label="Home" onTap={() => sendSpecialKey('Home', 'Home')} />
+            <ModKey label="End" onTap={() => sendSpecialKey('End', 'End')} />
           </div>
         </div>
       )}
 
-      {/* ── video area ── */}
+      {/* 视频区域 */}
       <div style={styles.videoWrapper} onMouseMove={resetHideTimer}>
         <video
           ref={videoRef}
@@ -470,11 +509,14 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
         />
         <div ref={cursorRef} style={styles.cursor} />
         {!videoStream && (
-          <div style={styles.waiting}><span>{t('connecting_webrtc')}</span></div>
+          <div style={styles.waiting}>
+            <div style={styles.waitingSpinner}>⟳</div>
+            <div>{t('connecting_webrtc')}</div>
+          </div>
         )}
       </div>
 
-      {/* ── mobile virtual keyboard input (off-screen) ── */}
+      {/* 移动端虚拟键盘输入 */}
       {isMobile && (
         <input
           ref={kbInputRef}
@@ -491,21 +533,21 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
         />
       )}
 
-      {/* ── mobile gesture hint ── */}
+      {/* 移动端手势提示 */}
       {isMobile && videoStream && <MobileHint />}
 
-      {/* ── disconnect confirmation dialog ── */}
+      {/* 断开连接确认 */}
       {showDisconnectDlg && (
         <div style={styles.dlgOverlay} onClick={() => setShowDisconnectDlg(false)}>
           <div style={styles.dlgBox} onClick={e => e.stopPropagation()}>
-            <div style={styles.dlgTitle}>{t('disconnect')}</div>
-            <div style={styles.dlgBody}>{t('disconnect_confirm')}</div>
+            <div style={styles.dlgTitle}>断开连接</div>
+            <div style={styles.dlgBody}>确定要断开与 {deviceName} 的远程连接吗？</div>
             <div style={styles.dlgActions}>
               <button style={styles.dlgCancel} onClick={() => setShowDisconnectDlg(false)}>
-                {t('cancel')}
+                取消
               </button>
               <button style={styles.dlgConfirm} onClick={onDisconnect}>
-                {t('disconnect')}
+                断开连接
               </button>
             </div>
           </div>
@@ -515,35 +557,31 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
   )
 }
 
-// ── Modifier key chip ─────────────────────────────────────────────────────────
-
+// 修饰键组件
 function ModKey({ label, active = false, onTap }: { label: string; active?: boolean; onTap: () => void }) {
   return (
     <button
-      onMouseDown={e => e.preventDefault()} // prevent focus loss on desktop
+      onMouseDown={e => e.preventDefault()}
       onClick={onTap}
       style={{
         padding: '5px 10px',
         margin: '0 2px',
         borderRadius: 5,
-        border: `1px solid ${active ? 'var(--accent-bdr)' : 'var(--border-2)'}`,
-        background: active ? 'var(--accent-dim)' : 'var(--surface-2)',
-        color: active ? 'var(--accent)' : 'var(--text-2)',
+        border: `1px solid ${active ? COLORS.primary : COLORS.border}`,
+        background: active ? COLORS.primaryBg : COLORS.surface2,
+        color: active ? COLORS.primary : COLORS.text2,
         fontSize: 12,
         fontWeight: active ? 700 : 400,
         cursor: 'pointer',
         whiteSpace: 'nowrap' as const,
         flexShrink: 0,
-        transition: 'background 0.15s, border-color 0.15s',
       }}
     >{label}</button>
   )
 }
 
-// ── One-time gesture hint ─────────────────────────────────────────────────────
-
+// 移动端手势提示
 function MobileHint() {
-  const { t } = useI18n()
   const [visible, setVisible] = useState(() => !sessionStorage.getItem('rc_hint_seen'))
   useEffect(() => {
     if (!visible) return
@@ -554,8 +592,8 @@ function MobileHint() {
   return (
     <div style={styles.hint} onClick={() => setVisible(false)}>
       <div style={styles.hintBox}>
-        <div>{t('hint_click')} &nbsp;|&nbsp; {t('hint_longpress')}</div>
-        <div>{t('hint_scroll')} &nbsp;|&nbsp; {t('hint_keyboard')}</div>
+        <div>单击点击 | 长按右键菜单</div>
+        <div>单指滚动 | 双指快速滚动</div>
       </div>
     </div>
   )
@@ -563,45 +601,118 @@ function MobileHint() {
 
 const styles: Record<string, React.CSSProperties> = {
   wrapper: {
-    position: 'relative', height: '100%', background: '#000', overflow: 'hidden',
+    position: 'relative', height: '100%', background: '#1a1a1a', overflow: 'hidden',
+    fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
   },
+  // 顶部工具栏
   toolbar: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '6px 12px', background: 'var(--surface)',
-    borderBottom: '1px solid var(--border)', overflowX: 'auto', gap: 8,
+    padding: '8px 16px',
+    background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 100%)',
+    backdropFilter: 'blur(10px)',
+    transition: 'transform 0.2s ease',
   },
-  toolbarLabel: {
-    fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
-    whiteSpace: 'nowrap', fontFamily: 'var(--mono)',
+  toolbarLeft: {
+    display: 'flex', alignItems: 'center', gap: 16,
   },
-  toolbarRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
-  swapLabel: { display: 'flex', alignItems: 'center', cursor: 'pointer', userSelect: 'none' as const },
+  deviceBadge: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    background: 'rgba(255,255,255,0.1)',
+    padding: '6px 12px',
+    borderRadius: 20,
+  },
+  deviceIcon: {
+    fontSize: 16,
+  },
+  deviceName: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: 500,
+  },
+  connectionStatus: {
+    display: 'flex', alignItems: 'center', gap: 6,
+  },
+  statusDot: {
+    width: 8, height: 8, borderRadius: '50%',
+  },
+  statusText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+  },
+  toolbarCenter: {
+    display: 'flex', alignItems: 'center', gap: 4,
+  },
   toolBtn: {
-    background: 'var(--surface-2)', color: 'var(--text-2)',
-    border: '1px solid var(--border-2)', borderRadius: 6,
-    padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--sans)',
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    padding: '8px 12px',
+    background: 'rgba(255,255,255,0.1)',
+    border: 'none',
+    borderRadius: 8,
+    cursor: 'pointer',
+    minWidth: 56,
+    transition: 'all 0.15s',
+  },
+  toolBtnActive: {
+    background: COLORS.primaryBg,
+    border: `1px solid ${COLORS.primary}`,
+  },
+  toolBtnIcon: {
+    fontSize: 18,
+    marginBottom: 2,
+  },
+  toolBtnLabel: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    opacity: 0.9,
+  },
+  toolbarRight: {
+    display: 'flex', alignItems: 'center', gap: 8,
+  },
+  hideBtn: {
+    background: 'rgba(255,255,255,0.1)',
+    border: 'none',
+    color: '#FFFFFF',
+    padding: '6px 10px',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontSize: 12,
   },
   disconnectBtn: {
-    background: 'var(--accent-dim)', color: 'var(--accent)',
-    border: '1px solid var(--accent-bdr)', borderRadius: 6,
-    padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--sans)',
+    background: COLORS.error,
+    border: 'none',
+    color: '#FFFFFF',
+    padding: '8px 16px',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: 500,
   },
+  showToolbar: {
+    position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+    zIndex: 20, cursor: 'pointer',
+    background: 'rgba(0,0,0,0.7)',
+    color: '#FFFFFF',
+    padding: '6px 16px',
+    borderRadius: '0 0 8px 8px',
+    fontSize: 12,
+  },
+  // 修饰键行
   modRow: {
     position: 'absolute', left: 0, right: 0, zIndex: 9,
-    background: 'var(--bg)', borderBottom: '1px solid var(--border)',
+    background: 'rgba(0,0,0,0.9)',
     overflowX: 'auto',
-    // positioned just below the toolbar; toolbar height ~36px
-    top: 36,
+    top: 56,
   },
   modRowInner: {
     display: 'flex', alignItems: 'center', padding: '5px 8px',
     width: 'max-content',
   },
   modSep: {
-    width: 1, height: 20, background: 'var(--border-2)',
+    width: 1, height: 20, background: COLORS.border,
     margin: '0 6px', flexShrink: 0,
   },
+  // 视频区域
   videoWrapper: {
     position: 'absolute', inset: 0,
     display: 'flex', alignItems: 'center',
@@ -618,9 +729,14 @@ const styles: Record<string, React.CSSProperties> = {
     pointerEvents: 'none', zIndex: 10,
   },
   waiting: {
-    position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-    justifyContent: 'center', color: 'var(--text-3)', fontSize: 14,
-    fontFamily: 'var(--mono)', letterSpacing: '0.04em',
+    position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    color: 'rgba(255,255,255,0.7)', fontSize: 14,
+    gap: 12,
+  },
+  waitingSpinner: {
+    fontSize: 32,
+    animation: 'spin 1s linear infinite',
   },
   hiddenInput: {
     position: 'fixed', left: '-9999px', top: 0,
@@ -631,37 +747,40 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center', paddingBottom: 40, pointerEvents: 'none', zIndex: 20,
   },
   hintBox: {
-    background: 'rgba(7,10,15,0.85)', color: 'var(--text-2)',
-    border: '1px solid var(--border-2)', borderRadius: 10,
-    padding: '10px 18px', fontSize: 13, lineHeight: 1.8, textAlign: 'center' as const,
+    background: 'rgba(0,0,0,0.85)',
+    color: 'rgba(255,255,255,0.9)',
+    borderRadius: 10,
+    padding: '12px 20px',
+    fontSize: 13, lineHeight: 1.8, textAlign: 'center' as const,
     backdropFilter: 'blur(8px)',
   },
+  // 弹窗
   dlgOverlay: {
     position: 'absolute' as const, inset: 0, zIndex: 100,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
   },
   dlgBox: {
-    background: 'var(--surface)', border: '1px solid var(--border-2)',
-    borderRadius: 12, padding: '20px 24px', minWidth: 260, maxWidth: 340,
+    background: COLORS.surface, borderRadius: 12,
+    padding: '24px', minWidth: 280, maxWidth: 340,
   },
   dlgTitle: {
-    fontSize: 15, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8,
+    fontSize: 16, fontWeight: 600, color: COLORS.text1, marginBottom: 8,
   },
   dlgBody: {
-    fontSize: 13, color: 'var(--text-2)', marginBottom: 20, lineHeight: 1.5,
+    fontSize: 14, color: COLORS.text2, marginBottom: 20, lineHeight: 1.5,
   },
   dlgActions: {
     display: 'flex', justifyContent: 'flex-end', gap: 8,
   },
   dlgCancel: {
-    background: 'var(--surface-2)', color: 'var(--text-2)',
-    border: '1px solid var(--border-2)', borderRadius: 6,
-    padding: '5px 14px', fontSize: 13, cursor: 'pointer',
+    background: COLORS.surface2, color: COLORS.text2,
+    border: 'none', borderRadius: 6,
+    padding: '8px 20px', fontSize: 14, cursor: 'pointer',
   },
   dlgConfirm: {
-    background: 'var(--accent-dim)', color: 'var(--accent)',
-    border: '1px solid var(--accent-bdr)', borderRadius: 6,
-    padding: '5px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 600,
+    background: COLORS.error, color: '#FFFFFF',
+    border: 'none', borderRadius: 6,
+    padding: '8px 20px', fontSize: 14, cursor: 'pointer', fontWeight: 500,
   },
 }

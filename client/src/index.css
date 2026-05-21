@@ -1,2 +1,54 @@
 *, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #0a0e1a; }
+html, body { 
+  margin: 0; 
+  padding: 0; 
+  background: #F0F2F5;
+  font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F0F0F0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C0C0C0;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A0A0A0;
+}
+
+/* 旋转动画 */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 输入框聚焦样式 */
+input:focus {
+  border-color: #FF7A00 !important;
+  box-shadow: 0 0 0 2px rgba(255, 122, 0, 0.1) !important;
+}
+
+/* 按钮悬停效果 */
+button:hover {
+  opacity: 0.9;
+}
+
+/* 卡片阴影 */
+.card-shadow {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 过渡动画 */
+.transition-all {
+  transition: all 0.2s ease;
+}
