@@ -1,185 +1,325 @@
 # RemoteCtl
 
-[![Stars](https://img.shields.io/github/stars/bsh888/remotectl?style=flat-square)](https://github.com/bsh888/remotectl)
-&nbsp;[中文文档](README.zh.md)
+[English](README.en.md) | 简体中文
 
-Cross-platform remote desktop tool. macOS / Windows / Linux as host, browser or native App as controller.
+<p align="center">
+  <img src="docs/images/logo.png" alt="RemoteCtl Logo" width="200">
+</p>
 
-## Features
+<p align="center">
+  <strong>基于 WebRTC 的跨平台远程桌面控制工具</strong>
+</p>
 
-- **H.264 hardware encoding** — VideoToolbox on macOS, x264 on Windows/Linux
-- **WebRTC transport** — peer-to-peer video stream; the server never touches video data
-- **TURN relay** — automatic relay for mobile (4G/5G) / symmetric NAT environments
-- **E2EE input encryption** — ECDH P-256 + AES-256-GCM end-to-end encrypted input events
-- **Low-latency mouse** — local cursor overlay for instant feedback; input over P2P DataChannel
-- **Cross-platform clipboard** — paste text (including CJK / Emoji) from controller to remote
-- **In-session chat** — real-time text messages and file transfer between controller and host
-- **Session password auth** — random 8-digit password generated on each start, simple and secure
-- **All-in-one desktop App** — single App for macOS/Windows/Linux with both "Remote Control" and "Share This PC" modes
-- **systemd deployment** — release package includes `install.sh` for one-command service setup, no root required for port 443
+<p align="center">
+  <a href="#特性">特性</a> •
+  <a href="#快速开始">快速开始</a> •
+  <a href="#部署">部署</a> •
+  <a href="#开发">开发</a> •
+  <a href="#文档">文档</a>
+</p>
 
-## vs. Commercial Tools
+---
 
-RemoteCtl shares the same WebRTC technology stack as Sunflower, TeamViewer, etc. The key differences are **control depth** and **data sovereignty**:
+## 简介
 
-| Feature | RemoteCtl | Sunflower |
-|---------|:---------:|:---------:|
-| Open source | ✓ | — |
-| Self-hosted (no third-party server) | ✓ | — |
-| Browser control (no client install) | ✓ | Partial |
-| Fully custom bitrate / resolution / FPS | ✓ | Partial |
-| Full mobile keyboard (modifiers + number row + F1–F12) | ✓ | Partial |
-| In-session chat + P2P file transfer | ✓ | — |
-| Completely free | ✓ | Partial |
+RemoteCtl 是一款开源的跨平台远程桌面控制工具，采用 WebRTC 技术实现端到端的视频流传输。支持浏览器和原生应用两种控制方式，让您可以随时随地远程控制您的电脑。
 
-- **Self-hosted**: deploy one public Linux server; video travels over WebRTC P2P and the server only forwards signaling — no audio/video ever passes through it.
-- **Quality tuning**: `bitrate`, `scale` (resolution), and `fps` are all independently adjustable. Max out `scale:1.0 bitrate:8M` on LAN; drop to `scale:0.5 bitrate:1M` on mobile 4G.
-- **Mobile keyboard**: modifier keys (Ctrl / Shift / Alt / Win / ⌘) can be pressed standalone; number row, arrow keys, and F1–F12 are always visible in the toolbar — enabling combos like Ctrl+B+1 for tmux.
-- **In-session chat**: controller and host communicate via WebRTC DataChannel directly (no server), with system notifications on the host side — great for sharing links, screenshots, and config files.
+### 核心优势
 
-> Sunflower data sourced from public materials; refer to its latest official release for accuracy.
+| 特性 | 说明 |
+|------|------|
+| 🌐 **浏览器控制** | 无需安装软件，通过浏览器即可远程控制 |
+| 🔒 **端到端加密** | ECDH P-256 + AES-256-GCM 加密，确保数据安全 |
+| ⚡ **低延迟** | P2P 直连传输，局域网延迟低于 50ms |
+| 🖥️ **跨平台** | 支持 Windows、macOS、Linux、Android、iOS |
+| 🏠 **私有部署** | 支持自建服务器，数据完全自主可控 |
+| 🎬 **硬件编码** | H.264 硬件加速，降低 CPU 占用 |
 
-## Screenshots
+---
 
-**Web — Landing Page & Features**
+## 特性
 
-![Landing page](docs/images/20260417155614_214_272.png)
-![Features & download](docs/images/20260417155650_215_272.png)
+### 远程控制功能
+- ✅ 实时屏幕共享（支持多显示器）
+- ✅ 鼠标键盘控制
+- ✅ 剪贴板同步（支持中文、Emoji）
+- ✅ 文件传输（双向）
+- ✅ 会话内聊天
 
-**Desktop App — Host Mode & Chat**
+### 技术特性
+- ✅ WebRTC P2P 视频传输
+- ✅ H.264 硬件编码（VideoToolbox/x264）
+- ✅ TURN 中继支持（4G/对称NAT）
+- ✅ E2EE 端到端加密
+- ✅ 自定义码率/帧率/分辨率
 
-![macOS host mode with chat](docs/images/20260417160025_216_272.png)
+### 平台支持
 
-**Browser — Remote Control**
+| 平台 | 控制端 | 被控端 |
+|------|:------:|:------:|
+| Windows | ✅ | ✅ |
+| macOS | ✅ | ✅ |
+| Linux | ✅ | ✅ |
+| Android | ✅ App | ❌ |
+| iOS | ✅ App | ❌ |
+| 浏览器 | ✅ | ❌ |
 
-<table>
-<tr>
-<td><img src="docs/images/20260417160323_217_272.png" alt="Admin panel + Windows remote"></td>
-<td><img src="docs/images/20260417160509_218_272.png" alt="Browser control panel"></td>
-</tr>
-</table>
+---
 
-**Mobile — Connect, Keyboard & Chat**
+## 快速开始
 
-<table>
-<tr>
-<td><img src="docs/images/20260417160558_222_272.png" alt="iOS connect screen" width="200"></td>
-<td><img src="docs/images/20260417160555_220_272.png" alt="Full keyboard toolbar" width="200"></td>
-<td><img src="docs/images/20260417160556_221_272.png" alt="System keyboard with modifier row" width="200"></td>
-<td><img src="docs/images/20260417160554_219_272.png" alt="In-session chat & file transfer" width="200"></td>
-</tr>
-</table>
+### 方式一：使用官方服务（演示）
 
-## Download
+1. 访问 [演示地址](https://remotectl.example.com)
+2. 在被控端下载并运行 Agent
+3. 在控制端输入设备 ID 和密码
 
-Go to the [Releases](https://github.com/bsh888/remotectl/releases) page to download the package for your platform.
+### 方式二：私有部署（推荐）
 
-| File | Description |
-|------|-------------|
-| `remotectl-app-macos-vX.Y.Z.zip` | macOS App (controller + host in one) |
-| `remotectl-app-windows-amd64-vX.Y.Z.zip` | Windows App (controller + host in one) |
-| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | Linux App (controller + host in one) |
-| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | Linux headless agent (no GUI, for servers) |
-| `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | Signaling server — Linux x86_64 (includes systemd scripts) |
-| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | Signaling server — Linux ARM64 (includes systemd scripts) |
-
-## Quick Start
-
-### Desktop App (controller + host)
-
-Download the `remotectl-app-*` package for your platform, unzip, and run. The App has two modes:
-
-- **Remote Control** — enter a Device ID and session password to connect and control a remote machine
-- **Share This PC** — share your screen with a controller
-
-### Linux Headless Agent
-
-For Linux servers without a desktop environment, download `remotectl-agent-linux-amd64-*`:
+#### 1. 部署信令服务器
 
 ```bash
-tar xzf remotectl-agent-linux-amd64-vX.Y.Z.tar.gz
-cd remotectl-agent-linux-amd64-vX.Y.Z
-cp agent.yaml.example agent.yaml
-vim agent.yaml   # fill in server address and token
-./remotectl-agent --config agent.yaml
+# 克隆仓库
+git clone https://github.com/ljxiong313/remotectl.git
+cd remotectl/server
+
+# 编译
+go build -o remotectl-server .
+
+# 配置
+cp server.yaml.example server.yaml
+vim server.yaml
+
+# 运行
+./remotectl-server --config server.yaml
 ```
 
-### Signaling Server (self-hosted)
-
-Download the `remotectl-server-linux-*` package and deploy as a systemd service:
+#### 2. 部署 TURN 服务器
 
 ```bash
-tar xzf remotectl-server-linux-amd64-vX.Y.Z.tar.gz
-cd remotectl-server-linux-amd64-vX.Y.Z
-
-# (optional) generate a self-signed TLS cert; skip if you already have one
-bash gen-cert.sh ./certs 1.2.3.4          # replace with your server's public IP
-# bash gen-cert.sh ./certs 1.2.3.4 my.domain.com   # also bind a domain name
-
-sudo bash install.sh    # installs to /opt/remotectl, adds iptables rule for port 443
-sudo vim /opt/remotectl/server.yaml   # fill in tokens, TLS paths, TURN config
-sudo systemctl restart remotectl-server
-```
-
-### TURN Relay (required for mobile networks)
-
-Needed for 4G/5G and carrier-grade NAT. Install coturn on the same server:
-
-```bash
+# 安装 coturn
 sudo apt install -y coturn
-sudo sed -i 's/#TURNSERVER_ENABLED/TURNSERVER_ENABLED/' /etc/default/coturn
-```
 
-Key settings in `/etc/turnserver.conf`:
-
-```
+# 配置 /etc/turnserver.conf
 listening-port=3478
-external-ip=<server public IP>
-realm=<domain or IP>
+external-ip=YOUR_PUBLIC_IP
+realm=your-domain.com
 lt-cred-mech
-user=remotectl:changeme
-no-multicast-peers
-```
+user=remotectl:your-password
 
-```bash
+# 启动
 sudo systemctl enable --now coturn
 ```
 
-Add TURN config to `server.yaml`:
-
-```yaml
-turn:
-  url:      "turn:1.2.3.4:3478"
-  user:     "remotectl"
-  password: "changeme"
-```
-
-**OS firewall (iptables):**
+#### 3. 安装被控端 Agent
 
 ```bash
-sudo iptables -I INPUT -p udp --dport 3478 -j ACCEPT
-sudo iptables -I INPUT -p tcp --dport 3478 -j ACCEPT
-sudo iptables -I INPUT -p udp --dport 49152:65535 -j ACCEPT
-sudo netfilter-persistent save
+# 下载 Agent
+wget https://github.com/ljxiong313/remotectl/releases/download/v1.0.0/remotectl-agent-linux-amd64.tar.gz
+tar xzf remotectl-agent-linux-amd64.tar.gz
+
+# 配置
+cp agent.yaml.example agent.yaml
+vim agent.yaml  # 填写服务器地址
+
+# 运行
+./remotectl-agent --config agent.yaml
 ```
 
-**OCI Security List (console):** Networking → Virtual Cloud Networks → your VCN → Security Lists → Default Security List → Add Ingress Rules:
+#### 4. 开始远程控制
 
-| Source CIDR | Protocol | Destination Port |
-|-------------|----------|-----------------|
-| `0.0.0.0/0` | UDP | `3478` |
-| `0.0.0.0/0` | TCP | `3478` |
-| `0.0.0.0/0` | UDP | `49152-65535` |
+打开浏览器访问您的服务器地址，输入被控端的设备 ID 和会话密码即可连接。
 
-> OCI has two firewall layers (Security List + instance iptables) — both must allow the ports.
+---
 
-## Platform Support
+## 部署
 
-| Platform | Controller | Host |
-|----------|-----------|------|
-| macOS | ✅ App | ✅ built into App |
-| Windows | ✅ App | ✅ built into App |
-| Linux | ✅ App | ✅ App / standalone agent |
-| iOS | ✅ App | ❌ |
-| Android | ✅ App | ❌ |
-| Browser | ✅ Web | ❌ |
+详细部署指南请参考：[部署文档](docs/deployment-guide.md)
+
+### 服务器要求
+
+| 配置项 | 最低要求 | 推荐配置 |
+|--------|----------|----------|
+| CPU | 1 核 | 2 核+ |
+| 内存 | 1 GB | 2 GB+ |
+| 带宽 | 5 Mbps | 10 Mbps+ |
+| 系统 | Ubuntu 20.04 | Ubuntu 22.04 |
+
+### 端口要求
+
+| 端口 | 协议 | 用途 |
+|------|------|------|
+| 443 | TCP | HTTPS/WSS 信令 |
+| 3478 | TCP/UDP | TURN STUN |
+| 49152-65535 | UDP | TURN 中继 |
+
+### 使用 systemd 管理服务
+
+```bash
+# 安装服务
+sudo bash deploy/install.sh
+
+# 管理服务
+sudo systemctl start remotectl-server
+sudo systemctl status remotectl-server
+sudo systemctl restart remotectl-server
+```
+
+---
+
+## 开发
+
+### 环境要求
+
+- Go >= 1.20
+- Node.js >= 18.0
+- Flutter >= 3.0（可选，用于桌面应用）
+
+### 项目结构
+
+```
+remotectl/
+├── agent/           # 被控端 (Go)
+│   ├── capture/     #   屏幕捕获
+│   ├── input/       #   输入控制
+│   ├── pipeline/    #   数据管道
+│   └── session/     #   会话管理
+├── server/          # 信令服务器 (Go)
+├── client/          # Web 客户端 (Vue3/TypeScript)
+├── app/             # 桌面应用 (Flutter)
+├── deploy/          # 部署配置
+└── docs/            # 文档
+```
+
+### 编译
+
+```bash
+# 编译 Server
+cd server && go build -o remotectl-server .
+
+# 编译 Agent
+cd agent && go build -o remotectl-agent .
+
+# 编译 Web Client
+cd client && npm install && npm run build
+
+# 编译桌面应用
+cd app && flutter build linux
+```
+
+### 运行测试
+
+```bash
+# Go 测试
+go test ./...
+
+# 前端测试
+cd client && npm test
+```
+
+---
+
+## 文档
+
+- [架构设计文档](docs/architecture.md) - 系统架构、模块设计、数据流
+- [使用手册](docs/user-guide.md) - 用户操作指南
+- [开发指南](docs/developer-guide.md) - 开发者贡献指南
+- [部署指南](docs/deployment-guide.md) - 服务器部署配置
+- [API 文档](docs/api.md) - WebSocket 和 DataChannel 接口
+
+---
+
+## 与商业软件对比
+
+| 功能 | RemoteCtl | 向日葵 | ToDesk |
+|------|:---------:|:------:|:------:|
+| 开源 | ✅ | ❌ | ❌ |
+| 私有部署 | ✅ | ❌ | 企业版 |
+| 浏览器控制 | ✅ | 专业版 | 专业版 |
+| 端到端加密 | ✅ | - | - |
+| 自定义服务器 | ✅ | ❌ | ❌ |
+| 完全免费 | ✅ | 部分 | 部分 |
+
+---
+
+## 安全说明
+
+### 数据加密
+- 视频流和控制指令采用端到端加密（E2EE）
+- 信令传输使用 TLS 加密
+- 服务器不存储任何明文数据
+
+### 隐私保护
+- 服务器仅转发信令，不接触视频数据
+- 聊天消息直接 P2P 传输
+- 会话结束后，临时数据自动清除
+
+### 安全建议
+- 会话密码仅使用一次
+- 定期更新到最新版本
+- 启用防火墙限制端口访问
+
+---
+
+## 常见问题
+
+**Q: 连接失败怎么办？**
+
+A: 请检查：
+1. 被控端是否在线
+2. 设备 ID 和密码是否正确
+3. 防火墙是否开放端口
+4. TURN 服务器是否正常运行
+
+**Q: 画面延迟很高？**
+
+A: 建议：
+1. 优先使用局域网连接
+2. 降低画质设置（码率、帧率）
+3. 检查网络带宽
+
+**Q: 如何在移动网络使用？**
+
+A: 移动网络需要配置 TURN 服务器，请参考 [部署指南](docs/deployment-guide.md)。
+
+---
+
+## 贡献
+
+欢迎贡献代码！请查看 [贡献指南](CONTRIBUTING.md)。
+
+### Pull Request 流程
+
+1. Fork 本仓库
+2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 创建 Pull Request
+
+---
+
+## 许可证
+
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+
+---
+
+## 致谢
+
+- [pion/webrtc](https://github.com/pion/webrtc) - Go WebRTC 实现
+- [coturn](https://github.com/coturn/coturn) - TURN 服务器
+- [Flutter](https://flutter.dev) - 跨平台 UI 框架
+- [Vue.js](https://vuejs.org) - 渐进式 JavaScript 框架
+
+---
+
+## 联系方式
+
+- 问题反馈：[GitHub Issues](https://github.com/ljxiong313/remotectl/issues)
+- 原项目：[bsh888/remotectl](https://github.com/bsh888/remotectl)
+
+---
+
+<p align="center">
+  Made with ❤️ by the RemoteCtl Community
+</p>
