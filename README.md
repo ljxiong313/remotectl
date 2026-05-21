@@ -169,11 +169,78 @@ sudo systemctl restart remotectl-server
 
 ## 开发
 
+### 技术栈
+
+| 组件 | 语言/框架 | 版本要求 | 用途 |
+|------|----------|----------|------|
+| **Server** | Go | >= 1.26 | 信令服务器 |
+| **Agent** | Go | >= 1.26 | 被控端程序 |
+| **Web Client** | TypeScript + React | Node >= 18 | Web 控制端 |
+| **Desktop App** | Dart + Flutter | >= 3.0.0 | 跨平台桌面应用 |
+
+### 依赖库
+
+**Go 后端依赖：**
+- `github.com/pion/webrtc/v3` - WebRTC 实现
+- `github.com/gorilla/websocket` - WebSocket 通信
+- `github.com/kbinani/screenshot` - 屏幕捕获
+- `golang.org/x/crypto` - 加密算法
+
+**前端依赖：**
+- `react` ^18.3.1 - UI 框架
+- `react-router-dom` ^6.23.0 - 路由管理
+- `vite` ^5.3.1 - 构建工具
+- `typescript` ^5.4.5 - 类型系统
+
+**Flutter 依赖：**
+- `flutter_webrtc` ^0.11.7 - WebRTC 支持
+- `web_socket_channel` ^3.0.2 - WebSocket 客户端
+- `cryptography` ^2.7.0 - 端到端加密
+
 ### 环境要求
 
-- Go >= 1.20
-- Node.js >= 18.0
-- Flutter >= 3.0（可选，用于桌面应用）
+#### 必需环境
+
+| 工具 | 版本 | 安装命令 |
+|------|------|----------|
+| Go | >= 1.26 | [官方下载](https://go.dev/dl/) |
+| Node.js | >= 18.0 | `brew install node` 或 [官网](https://nodejs.org/) |
+| npm | >= 9.0 | 随 Node.js 安装 |
+
+#### 可选环境（用于完整构建）
+
+| 工具 | 版本 | 用途 | 安装命令 |
+|------|------|------|----------|
+| Flutter | >= 3.0.0 | 桌面应用 | [官方文档](https://flutter.dev/docs/get-started/install) |
+| Docker | >= 20.0 | 容器化部署 | `brew install docker` |
+| mingw-w64 | 最新 | Windows 交叉编译(macOS) | `brew install mingw-w64` |
+| musl-cross | 最新 | Linux 静态链接(macOS) | `brew install filosottile/musl-cross/musl-cross` |
+
+#### 平台特定依赖
+
+**macOS 构建 Agent：**
+```bash
+# 需要 Xcode Command Line Tools
+xcode-select --install
+```
+
+**Windows 交叉编译（在 macOS/Linux 上）：**
+```bash
+# macOS
+brew install mingw-w64
+
+# 下载 Windows x264 库
+make setup-x264-win
+```
+
+**Linux 构建 Agent：**
+```bash
+# Ubuntu/Debian
+sudo apt install gcc libx264-dev libx11-dev libxext-dev
+
+# CentOS/RHEL
+sudo yum install gcc libx264-devel libX11-devel libXext-devel
+```
 
 ### 项目结构
 
@@ -193,8 +260,28 @@ remotectl/
 
 ### 编译
 
+#### 使用 Makefile（推荐）
+
 ```bash
-# 编译 Server
+# 初始化依赖
+make tidy
+
+# 完整构建（所有平台）
+make all
+
+# 分模块构建
+make server          # 编译 Server（当前平台）
+make server-all      # 编译 Server（所有平台）
+make client          # 编译 Web Client
+make agent-mac       # 编译 Agent (macOS)
+make agent-linux     # 编译 Agent (Linux)
+make agent-win       # 编译 Agent (Windows，需 mingw-w64)
+```
+
+#### 单独编译
+
+```bash
+# 编译 Server（当前平台）
 cd server && go build -o remotectl-server .
 
 # 编译 Agent
@@ -204,7 +291,39 @@ cd agent && go build -o remotectl-agent .
 cd client && npm install && npm run build
 
 # 编译桌面应用
-cd app && flutter build linux
+cd app && flutter build linux   # Linux
+cd app && flutter build macos    # macOS
+cd app && flutter build windows   # Windows
+```
+
+#### 构建产物
+
+构建产物位于 `deploy/bin/` 目录：
+
+| 产物 | 说明 |
+|------|------|
+| `remotectl-server` | 信令服务器（当前平台） |
+| `remotectl-server-*-arm64` | Server ARM64 版本 |
+| `remotectl-server-*-amd64` | Server AMD64 版本 |
+| `remotectl-agent-*` | Agent 各平台版本 |
+| `remotectl-*.zip` | macOS 应用包 |
+| `remotectl-*.tar.gz` | Linux 应用包 |
+
+### 开发调试
+
+```bash
+# 生成 TLS 证书
+make cert
+
+# 启动 Server 开发模式
+make dev-server
+
+# 启动 Web Client 开发模式
+make dev-client
+
+# Docker 部署
+make docker-build
+make docker-up
 ```
 
 ### 运行测试
